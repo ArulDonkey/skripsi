@@ -3,7 +3,7 @@ import urllib.request
 import numpy as np
 
 #Server url dari esp 32 cam
-url = "http://192.168.100.158/cam-hi.jpg"
+url = "http://192.168.100.174/cam-hi.jpg"
 
 #Memuat Haarcascade untuk deteksi wajah
 

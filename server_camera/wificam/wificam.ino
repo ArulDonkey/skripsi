@@ -1,23 +1,22 @@
-#include <WebServer.h>
 #include <WiFi.h>
+#include <WebServer.h>
 #include <esp32cam.h>
 #include "esp_camera.h"
- 
+
 const char* WIFI_SSID = "IYUS RUSTANDI";
-const char* WIFI_PASS = "29630708";
+const char* WIFI_PASS = "29022008";
+
+#define relayPin 12
 
 #define CAMERA_MODEL_AI_THINKER
-#include "camera_pins.h"
 
 WebServer server(80);
 
-#define SOLENOID_PIN 14
- 
 static auto loRes = esp32cam::Resolution::find(320, 240);
 static auto midRes = esp32cam::Resolution::find(350, 530);
 static auto hiRes = esp32cam::Resolution::find(800, 600);
-void serveJpg()
-{
+
+void serveJpg() {
   auto frame = esp32cam::capture();
   if (frame == nullptr) {
     Serial.println("CAPTURE FAIL");
@@ -26,31 +25,28 @@ void serveJpg()
   }
   Serial.printf("CAPTURE OK %dx%d %db\n", frame->getWidth(), frame->getHeight(),
                 static_cast<int>(frame->size()));
- 
+
   server.setContentLength(frame->size());
   server.send(200, "image/jpeg");
   WiFiClient client = server.client();
   frame->writeTo(client);
 }
- 
-void handleJpgLo()
-{
+
+void handleJpgLo() {
   if (!esp32cam::Camera.changeResolution(loRes)) {
     Serial.println("SET-LO-RES FAIL");
   }
   serveJpg();
 }
- 
-void handleJpgHi()
-{
+
+void handleJpgHi() {
   if (!esp32cam::Camera.changeResolution(hiRes)) {
     Serial.println("SET-HI-RES FAIL");
   }
   serveJpg();
 }
- 
-void handleJpgMid()
-{
+
+void handleJpgMid() {
   if (!esp32cam::Camera.changeResolution(midRes)) {
     Serial.println("SET-MID-RES FAIL");
   }
@@ -58,17 +54,22 @@ void handleJpgMid()
 }
 
 // Unlock System Door
-void handle_unlock() {
-  digitalWrite(SOLENOID_PIN, HIGH);
-  delay(5000); // Solenoid terbuka selama 5 detik
-  digitalWrite(SOLENOID_PIN, LOW);
-  server.send(200, "text/plain", "Door unlocked");
+void handleUnlock() {
+  digitalWrite(relayPin, HIGH);  // Buka kunci
+  server.send(200, "text/plain", "Door Unlocked");
 }
- 
- 
-void  setup(){
+
+void handleLock() {
+  digitalWrite(relayPin, LOW);  // Tutup kunci
+  server.send(200, "text/plain", "Door Locked");
+}
+
+void setup() {
   Serial.begin(115200);
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin, LOW);
   Serial.println();
+
   {
     using namespace esp32cam;
     Config cfg;
@@ -76,36 +77,33 @@ void  setup(){
     cfg.setResolution(hiRes);
     cfg.setBufferCount(2);
     cfg.setJpeg(80);
- 
+
     bool ok = Camera.begin(cfg);
     Serial.println(ok ? "CAMERA OK" : "CAMERA FAIL");
   }
-  
-  pinMode(SOLENOID_PIN, OUTPUT);
-  digitalWrite(SOLENOID_PIN, LOW);
 
+  // Start server
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
+    Serial.print(".");
   }
-  Serial.print("http://");
+  Serial.println("\nWiFi connected");
+  Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-  Serial.println("  /cam-lo.jpg");
-  Serial.println("  /cam-hi.jpg");
-  Serial.println("  /cam-mid.jpg");
-  Serial.println("  /unlock");
- 
+
   server.on("/cam-lo.jpg", handleJpgLo);
   server.on("/cam-hi.jpg", handleJpgHi);
   server.on("/cam-mid.jpg", handleJpgMid);
-  server.on("/unlock", HTTP_GET, handle_unlock);
- 
+  server.on("/unlock", handleUnlock);
+  server.on("/lock", handleLock);
+
   server.begin();
+  Serial.println("HTTP server started");
 }
- 
-void loop()
-{
+
+void loop() {
   server.handleClient();
 }
