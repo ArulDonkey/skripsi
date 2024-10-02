@@ -4,12 +4,12 @@ import numpy as np
 import requests
 
 # Server URL dari ESP32-CAM
-url = "http://192.168.100.174/cam-mid.jpg"
+url = "http://192.168.100.174/cam-veryhi.jpg"
 solenoid_on_url = "http://192.168.100.174/unlock"
 solenoid_off_url = "http://192.168.100.174/lock"
 
 # Memuat Haarcascade untuk deteksi wajah
-recognizer = cv2.face.LBPHFaceRecognizer_create()
+recognizer = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=8, grid_x=8, grid_y=8)
 recognizer.read('Trainer.yml')
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
@@ -28,16 +28,18 @@ while True:
         count += 1
         cv2.rectangle(img, (x, y), (x+w, y+h), (50, 50, 255), 1)
         id, confidence = recognizer.predict(gray[y:y+h, x:x+w])
-        if confidence < 100:
+        accuracy = 100 - confidence
+        if accuracy > 60:
             id = f"User {id}"
             requests.get(solenoid_on_url)  # Aktifkan solenoid
-            confidence = f"  {round(100 - confidence)}%"
+            accuracy = f"  {round(100 - confidence)}%"
+            # print(f"ID: {id}, Accuracy: {accuracy}%")
             
         else:
             id = "unknown"
             
         cv2.putText(img, str(id), (x+5, y-5), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        cv2.putText(img, str(confidence), (x+5, y+h-5), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 1)
+        cv2.putText(img, f"{accuracy}%", (x+5, y+h-5), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 1)
 
     # Tampilan hasil 
     cv2.imshow('ESP 32-Cam Face Detection', img)
